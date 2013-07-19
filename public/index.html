@@ -1,6 +1,128 @@
-<!DOCTYPE HTML>
-<HTML>
-<body>
-<h1>Hello World</h1>
-</body>
-</HTML>
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Mark My Run</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- External resources. -->
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/bootstrap-responsive.min.css" />
+
+    <!-- Application resources. -->
+    <link rel="stylesheet" href="css/main.css" />
+  </head>
+  <body class="container">
+
+    <!-- Header. -->
+    <h1 class="row-fluid">
+      <img class="pull-left" src="img/logo.png" />
+      Mark My Run
+    </h1>
+
+    <!-- Splash and content wrapper. -->
+    <img id="splash" src="img/splash.png" />
+    <div class="hide" id="content">
+
+    <!-- Location. -->
+    <form name="filters" ng-controller="LocationCtrl" novalidate>
+      <div class="input-append row-fluid">
+        <input name="location" required type="text" ng-model="location" bs-typeahead="typeahead">
+        <button class="btn" ng-click="slideToggle();">Filters <span class="caret"></span></button>
+        <button class="btn btn-primary" type="submit" ng-click="submit(location, selectedDistances(), selectedTypes())" ng-disabled="filters.$invalid">Go!</button>
+      </div>
+      <div class="control-group error row-fluid" ng-show="locationInit && filters.$invalid">
+        <div class="controls">
+          <span class="help-inline" ng-show="filters.location.$error.required">Please enter a location.</span>
+        </div>
+      </div>
+
+      <div class="filters hide row-fluid">
+        <div class="well well-small clearfix">
+          <div class="control-group span4">
+            <label class="control-label" for="poi"><strong>Distance</strong></label>
+            <div class="controls">
+              <label class="checkbox" ng-repeat="distance in distances">
+                <input name="distance" type="radio" value="{{ distance.id }}" ng-checked="distance.checked" ng-click="setDistance(distance)" ng-model="distance.checked" /> {{ distance.name }}
+              </label>
+            </div>
+          </div>
+          <div class="control-group span8">
+            <label class="control-label" for="poi" ng-click="toggleSelect()"><strong>Points of Interest</strong></label>
+            <div class="row-fluid">
+              <div class="controls span6">
+                <label class="checkbox" ng-repeat="type in types1">
+                  <input name="types[]" type="checkbox" value="{{ type.id }}" ng-checked="type.checked" ng-model="type.checked" /> {{ type.id | humanType }}
+                </label>
+              </div>
+              <div class="controls span6">
+                <label class="checkbox" ng-repeat="type in types2">
+                  <input name="types[]" type="checkbox" value="{{ type.id }}" ng-checked="type.checked" ng-model="type.checked" /> {{ type.id | humanType }}
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </form>
+
+    <!-- POI. -->
+    <div ng-controller="POICtrl">
+      <div ng-show="run.distance">
+        <span class="icon-map-marker"></span> {{ run.distance | number:1 }} mi (estimated)
+      </div>
+      <form name="poi" ng-show="places" novalidate>
+        <label class="row" ng-repeat="place in places">
+          <div class="span1 offset1">
+            <input type="checkbox" ng-click="select(place)" ng-model="place.checked" />
+          </div>
+          <div class="span10">
+            <h3>{{ place.name }}</h3>
+            <p ng-show="place.fullResults.types">
+              <span class="label" ng-repeat="type in place.types" style="margin-right: 2px">{{ type | humanType }}</span>
+            </p>
+            <div class="row">
+              <div class="span2">place.fullResults.photos[0].photo_reference</div>
+              <div class="span8">
+                <p ng-show="place.rating"><span class="icon-star"></span> {{ place.rating | number:1 }}</p>
+                <p><span class="icon-map-marker"></span> {{ place.distance | number:1 }} mi</p>
+              </div>
+            </div>
+          </div>
+        </label>
+        <div class="row">
+          <button class="btn btn-primary btn-large span12" type="submit" ng-click="plot(run)" ng-disabled="!selected">Create Run</button>
+        </div>
+      </form>
+
+    </div>
+
+    <!-- Map. -->
+    <div ng-controller="MapCtrl" ng-show="path">
+      <div id="map" style="height: 400px">map</div>
+
+      <div class="hide" ng-repeat="place in path">
+        <div data-id="{{ place._id }}">
+          {{ place.name || place.city }}
+        </div>
+      </div>
+    </div>
+
+    <!-- End content wrapper. -->
+    </div>
+
+    <!-- External resources. -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.1.5/angular.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/angular-strap/0.7.4/angular-strap.min.js"></script>
+    <script src="//maps.googleapis.com/maps/api/js?sensor=false">
+
+    <script>var KINVEY_DEBUG = true;</script>
+    <script src="vendor/kinvey-html5-1.0.4-snapshot.js"></script>
+
+    <!-- Application resources. -->
+    <script src="lib/app.js"></script>
+  </body>
+</html>

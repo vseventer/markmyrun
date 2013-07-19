@@ -1,0 +1,17 @@
+@charset 'utf8';
+
+/* Header */
+/* ====== */
+h1 {
+  line-height   : 60px;
+  margin-bottom : 0;
+}
+
+/* Generic */
+/* ======= */
+[name="filters"] {
+  position: relative;
+}
+.filters {
+  position: absolute;
+}
