@@ -27,9 +27,9 @@
     <!-- Location. -->
     <form name="filters" ng-controller="LocationCtrl" novalidate>
       <div class="input-append row-fluid">
-        <input name="location" required type="text" ng-model="location" bs-typeahead="typeahead">
+        <input name="location" required type="text" ng-change="updateLocationData(location)" ng-model="location" bs-typeahead="typeahead">
         <button class="btn" data-dropdown="filters" ng-click="slideToggle();">Filters <span class="caret"></span></button>
-        <button class="btn btn-primary" type="submit" ng-click="submit(location, selectedDistances(), selectedTypes())" ng-disabled="filters.$invalid">Go!</button>
+        <button class="btn btn-primary" type="submit" ng-click="submit(locationData, selectedDistances(), selectedTypes())" ng-disabled="filters.$invalid || !locationData">Go!</button>
       </div>
 
       <div class="filters hide row-fluid">
@@ -64,7 +64,7 @@
 
     <!-- Places. -->
     <div ng-controller="POICtrl">
-      <p class="alert alert-error" ng-show="locationError || 0 === places.length">Nothing worth seeing, please try again…</p>
+      <p class="alert alert-error" ng-show="0 === places.length">Nothing worth seeing, please try again…</p>
       <form name="poi" ng-show="places" novalidate>
         <label class="row-fluid" ng-repeat="place in places">
           <div class="span1 offset1">
@@ -89,7 +89,10 @@
     </div>
 
     <!-- Map. -->
-    <div id="map" ng-controller="MapCtrl" ng-show="path">
+    <div ng-controller="MapCtrl" ng-show="path">
+      <p><strong>Distance: {{ distance | number:1 }} mi.</strong></p>
+      <div id="map"></div>
+    </div>
 
     <!-- End content wrapper. -->
     </div>

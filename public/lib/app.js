@@ -11,8 +11,8 @@
    * Google Places namespace.
    */
   var GP = {
-    // Maximum number of waypoints per route.
-    MAX_WAYPOINTS : 8,
+    // Maximum number of points per route.
+    MAX_POINTS : 10,
 
     // Google Places type enumeration.
     // https://developers.google.com/places/documentation/search
@@ -129,7 +129,10 @@
 
       var query = new Kinvey.Query().near('_geoloc', coord).limit(1);
       Kinvey.DataStore.find('locations', query).then(function(response) {
-        deferred.resolve(response[0].city);
+        // Keep the users’ current position.
+        response[0]._geoloc = coord;
+        deferred.resolve(response[0]);
+
         $rootScope.$safeApply();
       }, deferred.reject);
 
@@ -145,7 +148,7 @@
   App.factory('distance', function() {
     var DEGREES_TO_RADIANS = 0.01745329252;
     var EARTH_RADIUS       = 6371 / 1.609344; // Miles.
-    var FUZZY_FACTOR       = 1.1;
+    var FUZZY_FACTOR       = 1.25;
     return function(coord1, coord2, fuzzy) {
       // Convert coordinates to radians.
       var lon1 = coord1[0] * DEGREES_TO_RADIANS;
@@ -156,7 +159,7 @@
       // Calculate distance.
       var distance = Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon1 - lon2);
       distance = EARTH_RADIUS * Math.acos(distance);
-      return false !== fuzzy ? distance * (FUZZY_FACTOR + distance / 25) : distance;
+      return distance * (false !== fuzzy ? FUZZY_FACTOR : 1);
     };
   });
 
@@ -222,6 +225,19 @@
       return deferred.promise;
     };
   }]);
+
+  /**
+   * GP helper to convert a Kinvey coordinate to a GP one.
+   *
+   * @param {Array|Object} A Kinvey object or coordinate.
+   * @returns {google.maps.LatLng} The GP coordinate.
+   */
+  App.factory('gpLatLng', function() {
+    return function(location) {
+      var coord = null != location._geoloc ? location._geoloc : location;
+      return new google.maps.LatLng(coord[1], coord[0]);
+    };
+  });
 
   /**
    * Returns an approximate solution to the TSP problem.
@@ -301,9 +317,8 @@
     // Wait for submit event before retrieving data.
     $scope.$on('submit', function() {
       // Reset view.
-      $scope.locationError = false;
-      $scope.places        = null;
-      $scope.run           = null;
+      $scope.places = null;
+      $scope.run    = null;
 
       // Extract event data.
       var data     = eventService.data;
@@ -311,18 +326,9 @@
       var radius   = parseFloat(data.distance.id);
       var types    = data.types.map(function(type) { return type.id; });
 
-      // Retrieve the location information.
-      var query   = new Kinvey.Query().equalTo('city', location);
-      var promise = Kinvey.DataStore.find('locations', query).then(function(response) {
-        if(response[0]) {
-          $scope.city   = response[0];
-          $scope.places = getPOI($scope.city._geoloc, radius, types);
-        }
-        else {// No results found.
-          $scope.locationError = true;
-        }
-        $rootScope.$safeApply($scope);
-      });
+      // Update the view.
+      $scope.city   = location;
+      $scope.places = getPOI(location._geoloc, radius, types);
     });
 
     // Submit handler.
@@ -341,19 +347,43 @@
    */
   App.controller('LocationCtrl', ['$filter', '$location', '$scope', 'Kinvey', 'currentLocation', 'eventService', function($filter, $location, $scope, Kinvey, currentLocation, eventService) {
     // Prefill with the users’ current location.
-    $scope.location = currentLocation.then(function(location) {
+    var lookup = {};
+    currentLocation.then(function(location) {
       // Automatically suggest POI for the users’ current location.
       $scope.submit(location, $scope.distances[0], []);
 
-      return location;
+      // Update view.
+      $scope.location     = location.city;
+      $scope.locationData = location;
+
+      // Add to lookup data.
+      lookup[location.city] = location;
+
+      // Show tooltip for a brief moment.
+      var tooltip = $('[name="location"]').tooltip({
+        container : '[name="filters"]',
+        placement : 'bottom',
+        title     : 'Don’t worry, the run will start at your exact position in ' + $scope.location + '.',
+        trigger   : 'manual'
+      }).tooltip('show');
+      setTimeout(function() {
+        tooltip.tooltip('hide');
+      }, 3000);
     });
 
     // Location typeahead.
     $scope.typeahead = function(pattern, fn) {
       var query = new Kinvey.Query().matches('city', pattern, { ignoreCase: true }).limit(5);
       Kinvey.DataStore.find('locations', query).then(function(response) {
-        fn( response.map(function(city) { return city.city; }) );
+        response = response.map(function(location) {
+          lookup[location.city] = location;
+          return location.city;
+        });
+        fn(response);
       });
+    };
+    $scope.updateLocationData = function(city) {
+      $scope.locationData = lookup[city] || null;
     };
 
     // Filter slider.
@@ -420,109 +450,137 @@
   /**
    * Map controller.
    */
-  App.controller('MapCtrl', ['$rootScope', '$scope', 'eventService', 'distance', function($rootScope, $scope, eventService, getDistance) {
+  App.controller('MapCtrl', ['$rootScope', '$scope', 'eventService', 'distance', 'gpLatLng', function($rootScope, $scope, eventService, getDistance, gpLatLng) {
+    // Obtain a reference to the map.
     var layer = $('#map')[0];
 
     // Wait for the run event before plotting a map.
     $scope.$on('run', function() {
       // Extract data.
       var path   = eventService.data.path;
-      var start  = path[0]._geoloc;
-      var end    = path[path.length - 1]._geoloc;
-      var center = [ (start[0] + end[0]) / 2, (start[1] + end[1]) / 2 ];
+      var length = path.length;
+
+      // Normalize start and end.
+      var start  = path[0];
+      var end    = path[length - 1];
+      var oneWay = start !== end;
+      start.name = start.name || (oneWay ? 'START'  : 'START/FINISH');
+      end.name   = end.name   || (oneWay ? 'FINISH' : 'START/FINISH');
 
       // Display data.
-      $scope.path = start === end ? path.slice(0, -1) : path;
+      $scope.path = true;
+      // $scope.path = start === end ? path.slice(0, -1) : path;
 
       // Plot map.
       var map = new google.maps.Map(layer, {
         zoom      : 15,
-        center    : new google.maps.LatLng(center[1], center[0]),
+        center    : gpLatLng(start),
         mapTypeId : google.maps.MapTypeId.ROADMAP
       });
 
-      // Add markers.
-      $scope.path.forEach(function(place, index) {
-        var color = 0 === index ? '0000FF' : 'FF0000';
-        var icon  = 0 === index ? 'flag'   : 'star';
+      // Add markers to the map.
+      path.forEach(function(location, index) {
+        // Do not place a marker at the end if the run is a round-trip.
+        if(length - 1 === index && oneWay) { return; }
 
-        var coord  = place._geoloc;
+        // Create marker.
+        var boundary = -1 !== [start, end].indexOf(location);
         var marker = new google.maps.Marker({
-          icon      : '//chart.googleapis.com/chart?chst=d_simple_text_icon_left&chld=|12|FFFFFF|' + icon + '|16|' + color + '|' + color,
-          map       : map,
-          position  : new google.maps.LatLng(coord[1], coord[0]),
-          title     : place.name
+          map      : map,
+          icon     : [
+            '//chart.googleapis.com/chart?chst=d_simple_text_icon_left&chld=|12|FFFFFF',
+            boundary ? 'flag' : 'star',
+            '16',
+            boundary ? '0000FF' : 'FF0000',
+            boundary ? '0000FF' : 'FF0000'
+          ].join('|'),
+          position : gpLatLng(location),
+          title    : location.name
         });
       });
 
-      // Add directions. Google Maps allows a maximum of 8 waypoints per route.
+      // Add running path. Google Maps allows max. 10 points (start, end, 8 waypoints) per route.
       var distance = 0;
       var index    = 0;
+      var pending  = 0;
+      var polyline = [];
       var segment  = [];
-      while(1 < (segment = path.slice(index, index + GP.MAX_WAYPOINTS)).length) {
+      while(0 !== (segment = path.slice(index, index + GP.MAX_POINTS)).length) {
         // Update counter.
-        index += GP.MAX_WAYPOINTS - 1;
+        index   += GP.MAX_POINTS - 1;
+        pending += 1;
 
-        // Add path.
-        var origin      = segment[0]._geoloc;
-        var destination = segment[segment.length - 1]._geoloc;
-        var request = {
-          origin      : new google.maps.LatLng(origin[1], origin[0]),
-          destination : new google.maps.LatLng(destination[1],   destination[0]),
-          waypoints   : segment.slice(1, -1).map(function(place) {
-            var coord = place._geoloc;
-            return { location: new google.maps.LatLng(coord[1], coord[0]) };
+        // Prepare route.
+        var origin      = segment[0];
+        var destination = segment[segment.length - 1];
+        var request     = {
+          origin      : gpLatLng(origin),
+          destination : gpLatLng(destination),
+          waypoints   : segment.slice(1, -1).map(function(location) {
+            return { location: gpLatLng(location) };
           }),
           travelMode  : google.maps.DirectionsTravelMode.WALKING
-        };
+        }
 
         // Get route.
         var directions = new google.maps.DirectionsService();
         directions.route(request, function(response, status) {
-          if(google.maps.DirectionsStatus.OK === status) {
-            var directionsDisplay = new google.maps.DirectionsRenderer({
-              map             : map,
-              polylineOptions : {
-                strokeColor  : '#000000',
-                strokeWeight : 5
-              },
-              suppressMarkers : true
-            });
-            directionsDisplay.setDirections(response);
+          // Update counter.
+          pending -= 1;
 
-            // Calculate distance and add mile markers.
-            // Add mile markers.
-            var distance = 0;
-            var mile     = 0;
-            var first = response.routes[0].overview_path[0];
-            var loc   = [ first.lng(), first.lat() ];
-            response.routes[0].overview_path.slice(1).forEach(function(latLng) {
-              var coord = [ latLng.lng(), latLng.lat() ];
-              distance += getDistance(loc, coord, false);
-
-              // Add mile markers.
-              if(mile !== parseInt(distance)) {
-                mile = parseInt(distance);
-                new google.maps.Marker({
-                  icon     : {
-                    anchor : new google.maps.Point(0, 10),
-                    url    : '//chart.googleapis.com/chart?chst=d_text_outline&chld=FFFFFF|12|h|000000|b|' + mile + '%20mi',
-                  },
-                  map      : map,
-                  position : latLng,
-                  title    : mile + ' mi'
-                });
-              }
-
-              // Update.
-              loc = coord;
-            });
-
-            // Force map refresh.
-            google.maps.event.trigger(map, "resize");
-
-            console.log(distance, eventService.data.distance);
+          if(google.maps.DirectionsStatus.OK !== status) {
+            // TODO error.
           }
+
+          // Force map refresh.
+          google.maps.event.trigger(map, "resize");
+
+          // Display the running path.
+          var directionsDisplay = new google.maps.DirectionsRenderer({
+            map             : map,
+            polylineOptions : {
+              strokeColor  : '#000000',
+              strokeWeight : 5
+            },
+            suppressMarkers : true
+          });
+          directionsDisplay.setDirections(response);
+
+          // Save polyline path for later.
+          polyline = polyline.concat(response.routes[0].overview_path);
+
+          // Calculate distance and add mile markers when done.
+          if(0 !== pending) {
+            return;
+          }
+
+          var mile     = 0;
+          var first    = polyline.shift();
+          var current  = [ first.lng(), first.lat() ];
+          polyline.forEach(function(latLng) {
+            // Calculate distance between two points.
+            var coord = [ latLng.lng(), latLng.lat() ];
+            distance += getDistance(current, coord, false);
+
+            // Add mile markers.
+            if(mile !== parseInt(distance)) {
+              mile = parseInt(distance);// Update.
+              new google.maps.Marker({
+                map      : map,
+                icon     : '//chart.googleapis.com/chart?chst=d_text_outline&chld=FFFFFF|12|h|000000|b|' + mile + '%20mi',
+                position : latLng,
+                title    : mile + ' mi'
+              });
+            }
+
+            // Update counter.
+            current = coord;
+          });
+
+          // Update view.
+          console.log(distance, eventService.data.distance);
+          $scope.distance = distance;
+          $rootScope.$safeApply($scope);
         });
       }
     });
