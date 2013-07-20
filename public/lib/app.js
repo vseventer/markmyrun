@@ -56,8 +56,6 @@
 
       // Initialize Angular.
       angular.bootstrap(document, ['MarkMyRun']);
-    }, function(e) {
-      alert(JSON.stringify(e);
     });
   });
 
@@ -147,7 +145,8 @@
   App.factory('distance', function() {
     var DEGREES_TO_RADIANS = 0.01745329252;
     var EARTH_RADIUS       = 6371 / 1.609344; // Miles.
-    return function(coord1, coord2) {
+    var FUZZY_FACTOR       = 1.1;
+    return function(coord1, coord2, fuzzy) {
       // Convert coordinates to radians.
       var lon1 = coord1[0] * DEGREES_TO_RADIANS;
       var lat1 = coord1[1] * DEGREES_TO_RADIANS;
@@ -156,7 +155,8 @@
 
       // Calculate distance.
       var distance = Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon1 - lon2);
-      return EARTH_RADIUS * Math.acos(distance);
+      distance = EARTH_RADIUS * Math.acos(distance);
+      return false !== fuzzy ? distance * (FUZZY_FACTOR + distance / 25) : distance;
     };
   });
 
@@ -301,8 +301,9 @@
     // Wait for submit event before retrieving data.
     $scope.$on('submit', function() {
       // Reset view.
-      $scope.places = null;
-      $scope.run    = null;
+      $scope.locationError = false;
+      $scope.places        = null;
+      $scope.run           = null;
 
       // Extract event data.
       var data     = eventService.data;
@@ -313,9 +314,13 @@
       // Retrieve the location information.
       var query   = new Kinvey.Query().equalTo('city', location);
       var promise = Kinvey.DataStore.find('locations', query).then(function(response) {
-        $scope.show   = true;
-        $scope.city   = response[0];
-        $scope.places = getPOI($scope.city._geoloc, radius, types);
+        if(response[0]) {
+          $scope.city   = response[0];
+          $scope.places = getPOI($scope.city._geoloc, radius, types);
+        }
+        else {// No results found.
+          $scope.locationError = true;
+        }
         $rootScope.$safeApply($scope);
       });
     });
@@ -493,7 +498,7 @@
             var loc   = [ first.lng(), first.lat() ];
             response.routes[0].overview_path.slice(1).forEach(function(latLng) {
               var coord = [ latLng.lng(), latLng.lat() ];
-              distance += getDistance(loc, coord);
+              distance += getDistance(loc, coord, false);
 
               // Add mile markers.
               if(mile !== parseInt(distance)) {

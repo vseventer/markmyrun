@@ -57,8 +57,7 @@ module.exports=h:"undefined"!=typeof window&&(window.sift=h)})();
     log.history = log.history || []; // Store logs to an array for reference.
     log.history.push(arguments);
     if(root.console) {
-      alert(JSON.stringify(arguments));
-      // root.console.log.call(root.console, Array.prototype.slice.call(arguments));
+      root.console.log.call(root.console, Array.prototype.slice.call(arguments));
     }
   };
 
