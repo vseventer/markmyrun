@@ -50,7 +50,6 @@
       appSecret : 'faca9fbbf01c432c8b7123a08f543d91'
     });
     promise.then(function() {
-      alert('test');
       // Reset view.
       $('#content').removeClass('hide');
       $('#splash').remove();
