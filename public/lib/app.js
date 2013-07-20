@@ -56,6 +56,8 @@
 
       // Initialize Angular.
       angular.bootstrap(document, ['MarkMyRun']);
+    }, function(e) {
+      alert(JSON.stringify(e);
     });
   });
 
