@@ -311,6 +311,7 @@
       // Retrieve the location information.
       var query   = new Kinvey.Query().equalTo('city', location);
       var promise = Kinvey.DataStore.find('locations', query).then(function(response) {
+        $scope.show   = true;
         $scope.city   = response[0];
         $scope.places = getPOI($scope.city._geoloc, radius, types);
         $rootScope.$safeApply($scope);
@@ -334,7 +335,9 @@
   App.controller('LocationCtrl', ['$filter', '$location', '$scope', 'Kinvey', 'currentLocation', 'eventService', function($filter, $location, $scope, Kinvey, currentLocation, eventService) {
     // Prefill with the users’ current location.
     $scope.location = currentLocation.then(function(location) {
-      $scope.locationInit = true;
+      // Automatically suggest POI for the users’ current location.
+      $scope.submit(location, $scope.distances[0], []);
+
       return location;
     });
 
@@ -347,8 +350,11 @@
     };
 
     // Filter slider.
+    var dropdown = $('[data-dropdown="filters"]');
     $scope.slideToggle = function(mode) {
-      $('.filters')['slide' + ('close' === mode ? 'Up' : 'Toggle')]();
+      var close = 'close' === mode;
+      $('.filters')['slide' + (close ? 'Up' : 'Toggle')]();
+      dropdown[(close ? 'remove' : 'toggle') + 'Class']('dropup disabled');
     };
 
     // Distance filter.
@@ -407,8 +413,7 @@
   /**
    * Map controller.
    */
-  App.controller('MapCtrl', ['$scope', 'eventService', 'distance', function($scope, eventService, getDistance) {
-    // Obtain a reference to the map element.
+  App.controller('MapCtrl', ['$rootScope', '$scope', 'eventService', 'distance', function($rootScope, $scope, eventService, getDistance) {
     var layer = $('#map')[0];
 
     // Wait for the run event before plotting a map.
@@ -506,11 +511,19 @@
               loc = coord;
             });
 
+            // Force map refresh.
+            google.maps.event.trigger(map, "resize");
+
             console.log(distance, eventService.data.distance);
           }
         });
       }
     });
+
+    // Hide map.
+    $scope.$on('submit', function() {
+      $scope.path = null;
+    })
   }]);
 
 }.call(this));
