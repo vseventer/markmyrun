@@ -190,20 +190,41 @@
 
       // Build the query.
       var query = new Kinvey.Query();
-      query.near(   '_geoloc', coord, radius);
+      query.near('_geoloc', coord, radius);
       query.equalTo('keyword', 'tourist');// Basic noise filter.
       query.equalTo('radius',  radius / MILES_TO_METERS);
       query.equalTo('types',   types.join('|'))
 
       // Find POI.
       Kinvey.DataStore.find('poi', query).then(function(response) {
+        var images = [];
+
         // Calculate the linear distance between `coord` and the place.
         response = response.map(function(place) {
+          // Preselect if coordinates match.
+          place.checked  = coord[0] === place._geoloc[0] && coord[1] === place._geoloc[1];
+
           place.distance = distance(coord, place._geoloc);
+          place.delta    = place.distance * 2;// Round-trip.
 
           // Add the place types.
-          place.types    = place.fullResults.types;
+          place.types = place.fullResults.types;
           place.types.sort();
+
+          // Retrieve the image.
+          place.image = 'img/place.png';// Default image.
+          if(place.fullResults.photos && place.fullResults.photos[0]) {
+            images.push(
+              Kinvey.execute('image', {
+                _id       : place.fullResults.id,
+                reference : place.fullResults.photos[0].photo_reference
+              }).then(function(response) {
+                if(null != response.URL) {
+                  place.image = response.URL;
+                }
+              }, function() { })
+            );
+          }
 
           // Return the place.
           return place;
@@ -215,12 +236,14 @@
         });
 
         // Return the POI.
-        deferred.resolve(response);
-        $rootScope.$safeApply();
+        Kinvey.Defer.all(images).then(function() {
+          deferred.resolve(response);
+          $rootScope.$safeApply();
+        });
       }, function(error) {
         deferred.reject(error);
         $rootScope.$safeApply();
-      });
+      }).then(null, function(E) { console.log(E, E.stack, E.name);});
 
       return deferred.promise;
     };
@@ -302,29 +325,50 @@
         places = places.filter(function(place) {
           return place.checked;
         });
-        $scope.run = tsp($scope.city, $scope.city, places);
+        $scope.run      = tsp($scope.city, $scope.city, places);
+        $scope.selected = places.length;
       });
-
-      // Update selection metadata.
-      if(place.checked) {
-        $scope.selected -= 1;
-      }
-      else {
-        $scope.selected += 1;
-      }
     };
 
+    // Calculates the delta distance if a place is (de)selected.
+    $scope.$watch('run', function(run) {
+      // If there is no path yet, return.
+      if(null == run) { return; }
+
+      // Update delta for each place.
+      $scope.places.then(function(places) {
+        return places.map(function(place) {
+          var start = run.path[0];
+          var end   = run.path[run.path.length - 1];
+          var path  = run.path.slice(1, -1);
+
+          // If place is not in path, add it. Otherwise, remove.
+          var index = path.indexOf(place);
+          if(-1 === index) {
+            path = path.concat(place);
+          }
+          else {
+            path.splice(index, 1);
+          }
+          place.delta = tsp(start, end, path).distance - run.distance;
+        });
+      });
+    });
+
     // Wait for submit event before retrieving data.
+    var radius, types;
     $scope.$on('submit', function() {
       // Reset view.
-      $scope.places = null;
-      $scope.run    = null;
+      $scope.map      = false;
+      $scope.places   = null;
+      $scope.selected = 0;
+      $scope.run      = null;
 
       // Extract event data.
       var data     = eventService.data;
       var location = data.location;
-      var radius   = parseFloat(data.distance.id);
-      var types    = data.types.map(function(type) { return type.id; });
+      radius = data.distance ? parseFloat(data.distance.id) : radius;
+      types  = data.types    ? data.types.map(function(type) { return type.id; }) : types;
 
       // Update the view.
       $scope.city   = location;
@@ -334,11 +378,23 @@
     // Submit handler.
     $scope.plot = function(path) {
       // Reset view.
-      $scope.places = null;
-      $scope.run    = null;
+      $scope.map      = true;
+      $scope.places   = null;
+      $scope.selected = 0;
+      $scope.run      = null;
 
       // Emit event.
       eventService.broadcast('run', path);
+    };
+
+    // Adjust starting position.
+    $scope.adjustStart = function(location, distance, types) {
+      // Emit event.
+      eventService.broadcast('submit', {
+        location : location,
+        distance : null,
+        types    : null
+      });
     };
   }]);
 

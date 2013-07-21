@@ -64,27 +64,32 @@
 
     <!-- Places. -->
     <div ng-controller="POICtrl">
+      <p class="alert alert-info" ng-show="!run.distance && !places.length && !map">Gathering Points of Interest for your location…</p>
       <p class="alert alert-error" ng-show="0 === places.length">Nothing worth seeing, please try again…</p>
       <form name="poi" ng-show="places" novalidate>
-        <label class="row-fluid" ng-repeat="place in places">
-          <div class="span1 offset1">
-            <input type="checkbox" ng-click="select(place)" ng-model="place.checked" />
-          </div>
-          <div class="span10">
-            <h3>{{ place.name }}</h3>
-            <p ng-show="place.fullResults.types">
-              <span class="label" ng-repeat="type in place.types" style="margin-right: 2px">{{ type | humanType }}</span>
-            </p>
-            <div class="row">
-              <div class="span2">place.fullResults.photos[0].photo_reference</div>
-              <div class="span8">
-                <p ng-show="place.rating"><span class="icon-star"></span> {{ place.rating | number:1 }}</p>
-                <p><span class="icon-map-marker"></span> {{ place.distance | number:1 }} mi</p>
+        <div class="places row-fluid" ng-repeat="place in places">
+          <label class="clearfix place well well-small">
+            <div class="select span1">
+              <input type="checkbox" ng-click="select(place)" ng-model="place.checked" />
+            </div>
+            <div class="span11">
+              <h3>{{ place.name }}</h3>
+              <div class="row-fluid">
+                <div class="span4" ng-show="place.image"><img alt="{{ place.name }}" src="{{ place.image }}" /></div>
+                <div class="span8">
+                  <p ng-show="place.fullResults.types">
+                    <span class="label" ng-repeat="type in place.types" style="margin-right: 2px">{{ type | humanType }}</span>
+                  </p>
+                  <p ng-show="place.rating"><span class="icon-star"></span> {{ place.rating | number:1 }}</p>
+                  <p ng-show="!place.checked"><span class="icon-map-marker"></span> +{{ place.delta | number:1 }} mi</p>
+                  <p ng-show="place.checked"><span class="icon-map-marker"></span> Deselect to shorten your run from {{ run.distance | number:1 }} to {{ run.distance + place.delta | number:1 }} miles.</p>
+                  <button class="btn btn-inverse btn-mini" ng-click="adjustStart(place)">Start my run here</button>
+                </div>
               </div>
             </div>
-          </div>
-        </label>
-        <button class="btn btn-primary btn-large span12" type="submit" ng-click="plot(run)" ng-disabled="!selected">I want to run {{ run.distance | number:1 }} miles!</button>
+          </label>
+        </div>
+        <button class="btn btn-primary btn-large row-fluid" type="submit" ng-click="plot(run)" ng-disabled="!selected">I want to run {{ run.distance | number:1 }} miles!</button>
       </form>
     </div>
 
