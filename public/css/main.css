@@ -9,6 +9,13 @@ h1 {
 
 /* Generic */
 /* ======= */
+#splash img {
+  border: 1px solid #CCCCCC;
+}
+#splash blockquote {
+  margin: 20px;
+}
+
 [name="filters"] {
   position: relative;
 }
@@ -18,19 +25,34 @@ h1 {
   z-index  : 100;
 }
 
-.places:nth-child(odd) .place {
+.places:nth-child(odd) .place, .path:nth-child(odd) {
   background-color: #E2F2FE;
 }
-.places:nth-child(even) .place {
+.places:nth-child(even) .place, .path:nth-child(even) {
   background-color: #FFF8CC;
 }
+  .path div {
+    margin-top : -20px;
+    overflow   : hidden;
+  }
 
 .select {
   text-align : center;
 }
 
 #map {
-  height     : 100%;
-  min-height : 500px;
-  width      : 100%;
+  height        : 100%;
+  margin-bottom : 20px;
+  min-height    : 500px;
+  width         : 100%;
+}
+
+.marker {
+  text-align: center;
+}
+
+/** FIX for Bootstrap and Google Maps Info window styes problem **/
+/** http://stackoverflow.com/questions/16708324/google-maps-infowindow-close-button-hidden */
+img[src*="gstatic.com/"], img[src*="googleapis.com/"] {
+  max-width: none;
 }

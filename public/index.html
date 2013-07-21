@@ -21,7 +21,12 @@
     </h1>
 
     <!-- Splash and content wrapper. -->
-    <img id="splash" src="img/splash.png" />
+    <div id="splash">
+      <img src="img/splash.png" />
+      <blockquote>
+        <em>Love traveling? Love running?<br />Get ready for your next big run while hitting the road and exploring the unknown!</em>
+      </blockquote>
+    </div>
     <div class="hide" id="content">
 
     <!-- Location. -->
@@ -89,14 +94,30 @@
             </div>
           </label>
         </div>
-        <button class="btn btn-primary btn-large row-fluid" type="submit" ng-click="plot(run)" ng-disabled="!selected">I want to run {{ run.distance | number:1 }} miles!</button>
+        <div class="row-fluid">
+          <button class="btn btn-primary btn-large span6" type="submit" ng-click="autocomplete(run)" ng-disabled="!selected">Autocomplete my {{ radius | number:1 }} mi run!</button>
+          <button class="btn btn-large span6" type="submit" ng-click="plot(run)" ng-disabled="!selected">I want to run {{ run.distance | number:1 }} miles!</button>
+        </div>
       </form>
     </div>
 
     <!-- Map. -->
     <div ng-controller="MapCtrl" ng-show="path">
-      <p><strong>Distance: {{ distance | number:1 }} mi.</strong></p>
       <div id="map"></div>
+      <div class="clearfix hide marker" data-marker="{{ place._id }}" ng-repeat="place in path">
+        <p><strong>{{ place.name }}</strong></p>
+        <img alt="{{ place.name }}" src="{{ place.image }}" ng-show="place.image">
+      </div>
+
+      <h3>Your {{ distance | number:1 }} mi run</h3>
+      <ol>
+        <li class="path well well-small" ng-repeat="place in path">
+          <div>
+            <p class="pull-left"><strong>{{ place.name }}</strong></p>
+            <img class="pull-right" alt="{{ place.name }}" src="{{ place.image }}" ng-show="place.image" />
+          </div>
+        </li>
+      </ol>
     </div>
 
     <!-- End content wrapper. -->

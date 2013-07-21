@@ -216,7 +216,7 @@
           if(place.fullResults.photos && place.fullResults.photos[0]) {
             images.push(
               Kinvey.execute('image', {
-                _id       : place.fullResults.id,
+                _id       : place._id,
                 reference : place.fullResults.photos[0].photo_reference
               }).then(function(response) {
                 if(null != response.URL) {
@@ -373,6 +373,7 @@
       // Update the view.
       $scope.city   = location;
       $scope.places = getPOI(location._geoloc, radius, types);
+      $scope.radius = radius;
     });
 
     // Submit handler.
@@ -394,6 +395,33 @@
         location : location,
         distance : null,
         types    : null
+      });
+    };
+
+    // Suggest route given a place.
+    $scope.autocomplete = function(run) {
+      var origin = run.path[0];
+      var radius = $scope.radius;
+      var path   = run.path.slice(1, -1);
+
+      // Add POI until radius is reached.
+      $scope.places.then(function(places) {
+        var index    = 0;
+        var newRoute = route = tsp(origin, origin, path);
+        while(newRoute.distance < radius && null != places[index]) {
+          // Update.
+          route = newRoute;
+
+          // Add a POI to our route.
+          if(-1 === path.indexOf(places[index])) {
+            path.push(places[index]);
+          }
+          newRoute = tsp(origin, origin, path);
+          index += 1;
+        }
+
+        // Submit.
+        $scope.plot(route);
       });
     };
   }]);
@@ -419,7 +447,7 @@
       var tooltip = $('[name="location"]').tooltip({
         container : '[name="filters"]',
         placement : 'bottom',
-        title     : 'Don’t worry, the run will start at your exact position in ' + $scope.location + '.',
+        title     : 'Don’t worry, the run will start at your current location in ' + $scope.location + '.',
         trigger   : 'manual'
       }).tooltip('show');
       setTimeout(function() {
@@ -512,6 +540,9 @@
 
     // Wait for the run event before plotting a map.
     $scope.$on('run', function() {
+      // Scroll to top.
+      $('html, body').animate({ scrollTop: 0 }, 'slow');
+
       // Extract data.
       var path   = eventService.data.path;
       var length = path.length;
@@ -524,14 +555,21 @@
       end.name   = end.name   || (oneWay ? 'FINISH' : 'START/FINISH');
 
       // Display data.
-      $scope.path = true;
-      // $scope.path = start === end ? path.slice(0, -1) : path;
+      $scope.start = start;
+      $scope.end   = end;
+      $scope.path  = path.slice(1, -1);
 
       // Plot map.
       var map = new google.maps.Map(layer, {
         zoom      : 15,
         center    : gpLatLng(start),
         mapTypeId : google.maps.MapTypeId.ROADMAP
+      });
+
+      // Create info window.
+      var infoWindow = new google.maps.InfoWindow({ zIndex: 100 });
+      google.maps.event.addListener(map, 'click', function() {
+        infoWindow.close();
       });
 
       // Add markers to the map.
@@ -552,6 +590,12 @@
           ].join('|'),
           position : gpLatLng(location),
           title    : location.name
+        });
+
+        // Click to open the info window.
+        google.maps.event.addListener(marker, 'click', function() {
+          infoWindow.setContent($('[data-marker="' + location._id + '"]').clone().removeClass('hide')[0]);
+          infoWindow.open(map, marker);
         });
       });
 
@@ -634,7 +678,6 @@
           });
 
           // Update view.
-          console.log(distance, eventService.data.distance);
           $scope.distance = distance;
           $rootScope.$safeApply($scope);
         });
