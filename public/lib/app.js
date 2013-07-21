@@ -66,12 +66,12 @@
     $routeProvider.otherwise({ controller : 'LocationCtrl' });
   });
   App.run(function($rootScope) {
-    $rootScope.$safeApply = function($scope, fn) {
+    $rootScope.$safeApply = function($scope) {
       $scope = $scope || $rootScope;
       if(!$scope.$$phase) {
         $scope.$apply();
       }
-    }
+    };
   });
 
   // Declare the `Kinvey` service.
@@ -82,6 +82,17 @@
 
   // Filters.
   // ========
+
+  /**
+   * URL-encodes a string.
+   *
+   * @returns {string} URL-encoded input.
+   */
+  App.filter('encode', function() {
+    return function(input) {
+      return root.encodeURIComponent(input);
+    };
+  });
 
   /**
    * Returns the human-readable type of a place.
@@ -184,16 +195,14 @@
    * @returns {Promise} List of POI, ordered by distance.
    */
   App.factory('getPointsOfInterest', ['$q', '$rootScope', 'distance', function($q, $rootScope, distance) {
-    var MILES_TO_METERS = 1609.344;// Google Places expects the radius in meters.
     return function(coord, radius, types) {
       var deferred = $q.defer();
 
       // Build the query.
       var query = new Kinvey.Query();
-      query.near('_geoloc', coord, radius);
+      query.near('_geoloc', coord, radius / 2);// Round-trip.
       query.equalTo('keyword', 'tourist');// Basic noise filter.
-      query.equalTo('radius',  radius / MILES_TO_METERS);
-      query.equalTo('types',   types.join('|'))
+      query.equalTo('types', types.join('|'));
 
       // Find POI.
       Kinvey.DataStore.find('poi', query).then(function(response) {
@@ -243,7 +252,7 @@
       }, function(error) {
         deferred.reject(error);
         $rootScope.$safeApply();
-      }).then(null, function(E) { console.log(E, E.stack, E.name);});
+      });
 
       return deferred.promise;
     };
@@ -319,7 +328,7 @@
   App.controller('POICtrl', ['$rootScope', '$scope', 'eventService', 'getPointsOfInterest', 'Kinvey', 'tsp', function($rootScope, $scope, eventService, getPOI, Kinvey, tsp) {
     // Places filter.
     $scope.selected = 0;
-    $scope.select   = function(place) {
+    $scope.select   = function() {
       // “Solve” TSP.
       $scope.places.then(function(places) {
         places = places.filter(function(place) {
@@ -389,7 +398,7 @@
     };
 
     // Adjust starting position.
-    $scope.adjustStart = function(location, distance, types) {
+    $scope.adjustStart = function(location) {
       // Emit event.
       eventService.broadcast('submit', {
         location : location,
@@ -407,7 +416,8 @@
       // Add POI until radius is reached.
       $scope.places.then(function(places) {
         var index    = 0;
-        var newRoute = route = tsp(origin, origin, path);
+        var route    = tsp(origin, origin, path);
+        var newRoute = route;
         while(newRoute.distance < radius && null != places[index]) {
           // Update.
           route = newRoute;
@@ -567,7 +577,7 @@
       });
 
       // Create info window.
-      var infoWindow = new google.maps.InfoWindow({ zIndex: 100 });
+      var infoWindow = new google.maps.InfoWindow({ zIndex: 200 });
       google.maps.event.addListener(map, 'click', function() {
         infoWindow.close();
       });
@@ -582,14 +592,15 @@
         var marker = new google.maps.Marker({
           map      : map,
           icon     : [
-            '//chart.googleapis.com/chart?chst=d_simple_text_icon_left&chld=|12|FFFFFF',
+            '//chart.googleapis.com/chart?chst=d_simple_text_icon_below&chld=|16|FF0000',
             boundary ? 'flag' : 'star',
-            '16',
+            boundary ? '16' : '24',
             boundary ? '0000FF' : 'FF0000',
-            boundary ? '0000FF' : 'FF0000'
+            boundary ? '0000FF' : 'FFFFFF'
           ].join('|'),
           position : gpLatLng(location),
-          title    : location.name
+          title    : location.name,
+          zIndex   : 100
         });
 
         // Click to open the info window.
@@ -602,6 +613,7 @@
       // Add running path. Google Maps allows max. 10 points (start, end, 8 waypoints) per route.
       var distance = 0;
       var index    = 0;
+      var legIndex = 0;
       var pending  = 0;
       var polyline = [];
       var segment  = [];
@@ -620,7 +632,7 @@
             return { location: gpLatLng(location) };
           }),
           travelMode  : google.maps.DirectionsTravelMode.WALKING
-        }
+        };
 
         // Get route.
         var directions = new google.maps.DirectionsService();
@@ -628,12 +640,13 @@
           // Update counter.
           pending -= 1;
 
+          // Return on error.
           if(google.maps.DirectionsStatus.OK !== status) {
-            // TODO error.
+            return;
           }
 
           // Force map refresh.
-          google.maps.event.trigger(map, "resize");
+          google.maps.event.trigger(map, 'resize');
 
           // Display the running path.
           var directionsDisplay = new google.maps.DirectionsRenderer({
@@ -649,6 +662,12 @@
           // Save polyline path for later.
           polyline = polyline.concat(response.routes[0].overview_path);
 
+          // Add route.
+          response.routes[0].legs.forEach(function(legs) {
+            path[legIndex].directions = legs.steps;
+            legIndex += 1;
+          });
+
           // Calculate distance and add mile markers when done.
           if(0 !== pending) {
             return;
@@ -663,13 +682,14 @@
             distance += getDistance(current, coord, false);
 
             // Add mile markers.
-            if(mile !== parseInt(distance)) {
-              mile = parseInt(distance);// Update.
+            if(mile !== parseInt(distance, 10)) {
+              mile = parseInt(distance, 10);// Update.
               new google.maps.Marker({
                 map      : map,
                 icon     : '//chart.googleapis.com/chart?chst=d_text_outline&chld=FFFFFF|12|h|000000|b|' + mile + '%20mi',
                 position : latLng,
-                title    : mile + ' mi'
+                title    : mile + ' mi',
+                zIndex   : 50
               });
             }
 
@@ -679,6 +699,22 @@
 
           // Update view.
           $scope.distance = distance;
+
+          // Social.
+          var mapUrl = 'https://maps.google.com/maps?dirflg=w&saddr=' + $scope.start._geoloc[1] + ',' + $scope.start._geoloc[0] + '&';
+          mapUrl += $scope.path.map(function(place, index) {
+            var prefix = 0 === index ? 'daddr=' : 'to:';
+            return prefix + root.encodeURIComponent(place.name);
+          }).join('+');
+          mapUrl += '+to:' + $scope.end._geoloc[1] + ',' + $scope.start._geoloc[0];
+          $scope.share = {
+            url     : mapUrl,
+            title   : 'My ' + $scope.distance.toFixed(1) + ' mi run in ' + $('[name="location"]').val() + '.',
+            summary : 'Visiting: ' + ($scope.path.map(function(place) {
+              return place.name;
+            }).join(', ')) + '.'
+          };
+
           $rootScope.$safeApply($scope);
         });
       }
@@ -687,7 +723,7 @@
     // Hide map.
     $scope.$on('submit', function() {
       $scope.path = null;
-    })
+    });
   }]);
 
 }.call(this));

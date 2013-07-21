@@ -31,8 +31,7 @@ h1 {
 .places:nth-child(even) .place, .path:nth-child(even) {
   background-color: #FFF8CC;
 }
-  .path div {
-    margin-top : -20px;
+  .path > div {
     overflow   : hidden;
   }
 

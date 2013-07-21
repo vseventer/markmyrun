@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- External resources. -->
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="bootstrap.min.css" />
     <link rel="stylesheet" href="css/bootstrap-responsive.min.css" />
 
     <!-- Application resources. -->
@@ -75,7 +75,7 @@
         <div class="places row-fluid" ng-repeat="place in places">
           <label class="clearfix place well well-small">
             <div class="select span1">
-              <input type="checkbox" ng-click="select(place)" ng-model="place.checked" />
+              <input type="checkbox" ng-click="select()" ng-model="place.checked" />
             </div>
             <div class="span11">
               <h3>{{ place.name }}</h3>
@@ -104,20 +104,55 @@
     <!-- Map. -->
     <div ng-controller="MapCtrl" ng-show="path">
       <div id="map"></div>
+
+      <!-- Markers. -->
+      <div class="clearfix hide marker" data-marker="{{ start._id }}" ng-show="start">
+        <p><strong>{{ start.name }}</strong></p>
+        <img alt="{{ start.name }}" src="{{ start.image }}" ng-show="start.image">
+      </div>
       <div class="clearfix hide marker" data-marker="{{ place._id }}" ng-repeat="place in path">
         <p><strong>{{ place.name }}</strong></p>
         <img alt="{{ place.name }}" src="{{ place.image }}" ng-show="place.image">
       </div>
 
       <h3>Your {{ distance | number:1 }} mi run</h3>
-      <ol>
-        <li class="path well well-small" ng-repeat="place in path">
-          <div>
-            <p class="pull-left"><strong>{{ place.name }}</strong></p>
-            <img class="pull-right" alt="{{ place.name }}" src="{{ place.image }}" ng-show="place.image" />
+      <p class="row-fluid">
+        <a class="btn btn-small" href="{{ share.url }}" target="_blank"><img alt="" src="img/icon-gm.png" /> GoogleMaps</a>
+        <a class="btn btn-small" href="//facebook.com/sharer/sharer.php?s=100&p[title]={{ share.title | encode }}&p[url]={{ share.url | encode }}&p[summary]={{ share.summary | encode }}" target="_blank"><img alt="" src="img/icon-fb.png" /> Share</a>
+        <a class="btn btn-small" href="//twitter.com/intent/tweet?text={{ share.title | encode }}&hashtags=MarkMyRun&url={{ share.url | encode }}" target="_blank"><img alt="" src="img/icon-tw.png" /> Tweet</a>
+      </p>
+      <div class="path well well-small">
+        <div>
+          <div class="pull-left">
+            <h3><strong>{{ start.name }}</strong></h3>
+            <ol ng-show="start.directions">
+              <li ng-repeat="direction in start.directions" ng-bind-html-unsafe="direction.instructions">
+                {{ direction.instructions }}
+              </li>
+            </ol>
           </div>
-        </li>
-      </ol>
+          <img class="pull-right" alt="{{ start.name }}" src="{{ start.image }}" ng-show="start.image" />
+        </div>
+      </div>
+      <div class="path well well-small" ng-repeat="place in path">
+        <div>
+          <div class="pull-left">
+            <h3><strong>{{ place.name }}</strong></h3>
+            <ol ng-show="place.directions">
+              <li ng-repeat="direction in place.directions" ng-bind-html-unsafe="direction.instructions">
+                {{ direction.instructions }}
+              </li>
+            </ol>
+          </div>
+          <img class="pull-right" alt="{{ place.name }}" src="{{ place.image }}" ng-show="place.image" />
+        </div>
+      </div>
+      <div class="path well well-small">
+        <div>
+          <h3 class="pull-left"><strong>{{ end.name }}</strong></h3>
+          <img class="pull-right" alt="{{ end.name }}" src="{{ end.image }}" ng-show="end.image" />
+        </div>
+      </div>
     </div>
 
     <!-- End content wrapper. -->
@@ -129,9 +164,7 @@
     <script src="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/angular-strap/0.7.4/angular-strap.min.js"></script>
     <script src="//maps.googleapis.com/maps/api/js?sensor=false"></script>
-
-    <script>var KINVEY_DEBUG = true;</script>
-    <script src="vendor/kinvey-html5-1.0.4-snapshot.js"></script>
+    <script src="vendor/kinvey-html5-1.0.4-snapshot.min.js"></script>
 
     <!-- Application resources. -->
     <script src="lib/app.js"></script>
