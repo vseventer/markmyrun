@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- External resources. -->
-    <link rel="stylesheet" href="bootstrap.min.css" />
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/bootstrap-responsive.min.css" />
 
     <!-- Application resources. -->
@@ -17,7 +17,7 @@
     <!-- Header. -->
     <h1 class="row-fluid">
       <img class="pull-left" src="img/logo.png" />
-      Mark My Run
+      <a href="/">Mark My Run</a>
     </h1>
 
     <!-- Splash and content wrapper. -->
@@ -33,7 +33,7 @@
     <form name="filters" ng-controller="LocationCtrl" novalidate>
       <div class="input-append row-fluid">
         <input name="location" required type="text" ng-change="updateLocationData(location)" ng-model="location" bs-typeahead="typeahead">
-        <button class="btn" data-dropdown="filters" ng-click="slideToggle();">Filters <span class="caret"></span></button>
+        <a class="btn" data-dropdown="filters" ng-click="slideToggle();">Filters <span class="caret"></span></a>
         <button class="btn btn-primary" type="submit" ng-click="submit(locationData, selectedDistances(), selectedTypes())" ng-disabled="filters.$invalid || !locationData">Go!</button>
       </div>
 

@@ -50,12 +50,15 @@
       appSecret : 'faca9fbbf01c432c8b7123a08f543d91'
     });
     promise.then(function() {
-      // Reset view.
-      $('#content').removeClass('hide');
-      $('#splash').remove();
+      // Keep splash page alive for presentation purposes.
+      if(-1 === root.location.href.indexOf('splash')) {
+        // Reset view.
+        $('#content').removeClass('hide');
+        $('#splash').remove();
 
-      // Initialize Angular.
-      angular.bootstrap(document, ['MarkMyRun']);
+        // Initialize Angular.
+        angular.bootstrap(document, ['MarkMyRun']);
+      }
     });
   });
 
@@ -451,7 +454,7 @@
       $scope.locationData = location;
 
       // Add to lookup data.
-      lookup[location.city] = location;
+      lookup[location.city.toLowerCase()] = location;
 
       // Show tooltip for a brief moment.
       var tooltip = $('[name="location"]').tooltip({
@@ -470,14 +473,14 @@
       var query = new Kinvey.Query().matches('city', pattern, { ignoreCase: true }).limit(5);
       Kinvey.DataStore.find('locations', query).then(function(response) {
         response = response.map(function(location) {
-          lookup[location.city] = location;
+          lookup[location.city.toLowerCase()] = location;
           return location.city;
         });
         fn(response);
       });
     };
     $scope.updateLocationData = function(city) {
-      $scope.locationData = lookup[city] || null;
+      $scope.locationData = lookup[city.toLowerCase()] || null;
     };
 
     // Filter slider.
@@ -704,7 +707,7 @@
           var mapUrl = 'https://maps.google.com/maps?dirflg=w&saddr=' + $scope.start._geoloc[1] + ',' + $scope.start._geoloc[0] + '&';
           mapUrl += $scope.path.map(function(place, index) {
             var prefix = 0 === index ? 'daddr=' : 'to:';
-            return prefix + root.encodeURIComponent(place.name);
+            return prefix + root.encodeURIComponent(place._geoloc[1] + ',' + place._geoloc[0] + ' (' + place.name + ')');
           }).join('+');
           mapUrl += '+to:' + $scope.end._geoloc[1] + ',' + $scope.start._geoloc[0];
           $scope.share = {
