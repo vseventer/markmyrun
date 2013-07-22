@@ -572,10 +572,16 @@
       $scope.end   = end;
       $scope.path  = path.slice(1, -1);
 
+      var middle = path[Math.ceil(path.length / 2)];
+      var center = gpLatLng([
+        (middle._geoloc[0] + start._geoloc[0]) / 2,
+        (middle._geoloc[1] + start._geoloc[1]) / 2,
+      ]);
+
       // Plot map.
       var map = new google.maps.Map(layer, {
         zoom      : 15,
-        center    : gpLatLng(start),
+        center    : center,
         mapTypeId : google.maps.MapTypeId.ROADMAP
       });
 
@@ -621,105 +627,128 @@
       var polyline = [];
       var segment  = [];
       while(0 !== (segment = path.slice(index, index + GP.MAX_POINTS)).length) {
-        // Update counter.
-        index   += GP.MAX_POINTS - 1;
+        // Update pending counter.
         pending += 1;
 
         // Prepare route.
         var origin      = segment[0];
         var destination = segment[segment.length - 1];
         var request     = {
-          origin      : gpLatLng(origin),
-          destination : gpLatLng(destination),
-          waypoints   : segment.slice(1, -1).map(function(location) {
+          origin            : gpLatLng(origin),
+          destination       : gpLatLng(destination),
+          waypoints         : segment.slice(1, -1).map(function(location) {
             return { location: gpLatLng(location) };
           }),
-          travelMode  : google.maps.DirectionsTravelMode.WALKING
+          optimizeWaypoints : true,
+          travelMode        : google.maps.DirectionsTravelMode.WALKING
         };
 
         // Get route.
         var directions = new google.maps.DirectionsService();
-        directions.route(request, function(response, status) {
-          // Update counter.
-          pending -= 1;
+        directions.route(request, (function(segment, index) {
+          return function(response, status) {
+            // Update counter.
+            pending -= 1;
 
-          // Return on error.
-          if(google.maps.DirectionsStatus.OK !== status) {
-            return;
-          }
-
-          // Force map refresh.
-          google.maps.event.trigger(map, 'resize');
-
-          // Display the running path.
-          var directionsDisplay = new google.maps.DirectionsRenderer({
-            map             : map,
-            polylineOptions : {
-              strokeColor  : '#000000',
-              strokeWeight : 5
-            },
-            suppressMarkers : true
-          });
-          directionsDisplay.setDirections(response);
-
-          // Save polyline path for later.
-          polyline = polyline.concat(response.routes[0].overview_path);
-
-          // Add route.
-          response.routes[0].legs.forEach(function(legs) {
-            path[legIndex].directions = legs.steps;
-            legIndex += 1;
-          });
-
-          // Calculate distance and add mile markers when done.
-          if(0 !== pending) {
-            return;
-          }
-
-          var mile     = 0;
-          var first    = polyline.shift();
-          var current  = [ first.lng(), first.lat() ];
-          polyline.forEach(function(latLng) {
-            // Calculate distance between two points.
-            var coord = [ latLng.lng(), latLng.lat() ];
-            distance += getDistance(current, coord, false);
-
-            // Add mile markers.
-            if(mile !== parseInt(distance, 10)) {
-              mile = parseInt(distance, 10);// Update.
-              new google.maps.Marker({
-                map      : map,
-                icon     : '//chart.googleapis.com/chart?chst=d_text_outline&chld=FFFFFF|12|h|000000|b|' + mile + '%20mi',
-                position : latLng,
-                title    : mile + ' mi',
-                zIndex   : 50
-              });
+            // Return on error.
+            if(google.maps.DirectionsStatus.OK !== status) {
+              return;
             }
 
-            // Update counter.
-            current = coord;
-          });
+            // Re-order waypoints.
+            var newOrder  = response.routes[0].waypoint_order;
+            if(0 !== newOrder.length) {
+              var waypoints = segment.slice(0);// Copy by value.
+              waypoints.sort(function(a, b) {
+                var aIndex = segment.indexOf(a);
+                var bIndex = segment.indexOf(b);
+                return newOrder.indexOf(aIndex) <= newOrder.indexOf(bIndex) ? -1 : 1;
+              });
+              path = path.slice(0, index + 1).concat(waypoints, path.slice(index + waypoints.length + 1));
 
-          // Update view.
-          $scope.distance = distance;
+              // Update the view.
+              $scope.path = path.slice(1, -1);
+              $rootScope.$safeApply($scope);
+            }
 
-          // Social.
-          var mapUrl = 'https://maps.google.com/maps?dirflg=w&saddr=' + $scope.start._geoloc[1] + ',' + $scope.start._geoloc[0] + '&';
-          mapUrl += $scope.path.map(function(place, index) {
-            var prefix = 0 === index ? 'daddr=' : 'to:';
-            return prefix + root.encodeURIComponent(place._geoloc[1] + ',' + place._geoloc[0] + ' (' + place.name + ')');
-          }).join('+');
-          mapUrl += '+to:' + $scope.end._geoloc[1] + ',' + $scope.start._geoloc[0];
-          $scope.share = {
-            url     : mapUrl,
-            title   : 'My ' + $scope.distance.toFixed(1) + ' mi run in ' + $('[name="location"]').val() + '.',
-            summary : 'Visiting: ' + ($scope.path.map(function(place) {
-              return place.name;
-            }).join(', ')) + '.'
+            // Force map refresh and re-center.
+            google.maps.event.trigger(map, 'resize');
+            map.setCenter(center);
+
+            // Display the running path.
+            var directionsDisplay = new google.maps.DirectionsRenderer({
+              map              : map,
+              polylineOptions  : {
+                strokeColor  : '#000000',
+                strokeWeight : 5
+              },
+              preserveViewport : path.length > GP.MAX_POINTS,
+              suppressMarkers  : true
+            });
+            directionsDisplay.setDirections(response);
+
+            // Save polyline path for later.
+            polyline = polyline.concat(response.routes[0].overview_path);
+
+            // Add route.
+            response.routes[0].legs.forEach(function(legs) {
+              path[legIndex].directions = legs.steps;
+              legIndex += 1;
+            });
+
+            // Calculate distance and add mile markers when done.
+            if(0 !== pending) {
+              return;
+            }
+
+            var mile     = 0;
+            var first    = polyline.shift();
+            var current  = [ first.lng(), first.lat() ];
+            polyline.forEach(function(latLng) {
+              // Calculate distance between two points.
+              var coord = [ latLng.lng(), latLng.lat() ];
+              distance += getDistance(current, coord, false);
+
+              // Add mile markers.
+              if(mile !== parseInt(distance, 10)) {
+                mile = parseInt(distance, 10);// Update.
+                new google.maps.Marker({
+                  map      : map,
+                  icon     : '//chart.googleapis.com/chart?chst=d_text_outline&chld=FFFFFF|12|h|000000|b|' + mile + '%20mi',
+                  position : latLng,
+                  title    : mile + ' mi',
+                  zIndex   : 50
+                });
+              }
+
+              // Update counter.
+              current = coord;
+            });
+
+            // Update view.
+            $scope.distance = distance;
+
+            // Social.
+            var mapUrl = 'https://maps.google.com/maps?dirflg=w&saddr=' + $scope.start._geoloc[1] + ',' + $scope.start._geoloc[0] + '&';
+            mapUrl += $scope.path.map(function(place, index) {
+              var prefix = 0 === index ? 'daddr=' : 'to:';
+              return prefix + root.encodeURIComponent(place._geoloc[1] + ',' + place._geoloc[0] + ' (' + place.name + ')');
+            }).join('+');
+            mapUrl += '+to:' + $scope.end._geoloc[1] + ',' + $scope.start._geoloc[0];
+            $scope.share = {
+              url     : mapUrl,
+              title   : 'My ' + $scope.distance.toFixed(1) + ' mi run in ' + $('[name="location"]').val() + '.',
+              summary : 'Visiting: ' + ($scope.path.map(function(place) {
+                return place.name;
+              }).join(', ')) + '.'
+            };
+
+            $rootScope.$safeApply($scope);
           };
+        }(segment.slice(1, -1), index)));
 
-          $rootScope.$safeApply($scope);
-        });
+        // Update index counter.
+        index += GP.MAX_POINTS - 1;
       }
     });
 
