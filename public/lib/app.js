@@ -594,7 +594,7 @@
       // Add markers to the map.
       path.forEach(function(location, index) {
         // Do not place a marker at the end if the run is a round-trip.
-        if(length - 1 === index && oneWay) { return; }
+        if((length - 1 === index && oneWay) || (start === location && index > 0)) { return; }
 
         // Create marker.
         var boundary = -1 !== [start, end].indexOf(location);
