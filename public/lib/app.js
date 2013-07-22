@@ -162,7 +162,7 @@
   App.factory('distance', function() {
     var DEGREES_TO_RADIANS = 0.01745329252;
     var EARTH_RADIUS       = 6371 / 1.609344; // Miles.
-    var FUZZY_FACTOR       = 1.25;
+    var FUZZY_FACTOR       = 1.05;
     return function(coord1, coord2, fuzzy) {
       // Convert coordinates to radians.
       var lon1 = coord1[0] * DEGREES_TO_RADIANS;
