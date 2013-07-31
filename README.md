@@ -1,5 +1,5 @@
 # MarkMyRun
-> [Kinvey](http://www.kinvey.com) hackathon app.
+> [Kinvey](http://www.kinvey.com) hackathon app. A working version is available [here](https://mark-my-run.herokuapp.com/).
 
 ## Summary
 The app retrieves Points of Interest based on the users’ current location, or the location entered. After, the user can pick any number of locations it wants to visit during a run. The app will then propose a running route. The purpose of this app is to combine the best of traveling and running.
