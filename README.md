@@ -11,7 +11,7 @@ After cloning the repository:
   * Obtain a [Google Places API Key](https://developers.google.com/places/documentation/), and configure the location addon in your backend.
   * In your backend, create a `locations` collection and import `assets/locations.json`. Set the collection permissions to *Read Only*.
   * In your backend, create an `images` collection. Set the collection permissions to *Private*.
-  * In your backend, add an `image` custom endpoint. Paste the code from `assets/custom-endpoint.js`.
+  * In your backend, add an `image` custom endpoint. Paste the code from `assets/custom-endpoint.js`. Set the `GOOGLE_PLACES_API_KEY` constant to your Google Places API Key, obtained in step 2.
 
 Your backend is now set-up. To run your app:
 
