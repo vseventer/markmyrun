@@ -1,19 +1,25 @@
 {
-  "name": "Heroku_Seed_Project",
-	"author": "Ryan Kahn",
-  "version": "0.0.1",
-  "scripts": {
-    "start": "node index"
+  "name"        : "MarkMyRun",
+  "version"     : "0.0.1",
+  "description" : "Traveling and running combined.",
+  "license"     : "MIT",
+  "author"      : "Mark van Seventer",
+  "repository"  : {
+    "type" : "git",
+    "url"  : "git@github.com:vseventer/markmyrun.git"
   },
   "dependencies": {
-    "express": "3.0.0rc4",
-    "coffee-script": "1.3.x",
-    "express-coffee": "0.0.9",
-    "less-middleware": "0.1.x",
-    "nunjucks": "0.1.4"
+    "coffee-script"   : "1.3.x",
+    "express"         : "3.0.0rc4",
+    "express-coffee"  : "0.0.9",
+    "less-middleware" : "0.1.x",
+    "nunjucks"        : "0.1.4"
   },
   "engines": {
-    "node": "0.8.x",
-    "npm": "1.1.x"
+    "node" : "0.8.x",
+    "npm"  : "1.1.x"
+  },
+  "scripts": {
+    "start": "node index"
   }
 }

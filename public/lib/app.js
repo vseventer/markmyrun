@@ -46,8 +46,8 @@
   // Bootstrap manually since `Kinvey.init` is asynchronous.
   angular.element(document).ready(function() {
     var promise = Kinvey.init({
-      appKey    : 'kid_eeshNBAnZM',
-      appSecret : 'faca9fbbf01c432c8b7123a08f543d91'
+      appKey    : 'Your App Key',
+      appSecret : 'Your App Secret'
     });
     promise.then(function() {
       // Keep splash page alive for presentation purposes.
